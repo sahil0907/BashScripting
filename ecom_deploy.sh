@@ -1,52 +1,53 @@
-#Author: Sahil Sharma
-#About: Using this script we are deploying a python-flask appliction(Ecom.) on a different machine, we have files on our host system and we will transfer those files to our server and install every dependency and run our application there and test if its running or not. 
-
-#make a specific user for this and only this user will be used to run this appliction, so change the ownership of this ecom folder to this user
-
-#/bin/bash
-
-
-
-# Update the package list
-sudo apt update
-
-# Install Python3, Virtual Environment tool, and Pip
-sudo apt install python3 python3-pip python3-venv build-essential -y
-
-mkdir -p ~/ecomm-app
+#!/bin/bash
+sudo apt  update -qq >/dev/null 2>&1
+#looping through the dependencies
+PACKAGES=(python3 python3-pip python3-venv build-essential rsync)
+for pkg in "${PACKAGES[@]}"
+do
+	if ! dpkg -s "$pkg" >/dev/null 2>&1
+	then	
+	  sudo apt install -y "$pkg"
+	fi
+done
+#creating the directory structure
+mkdir -p ~/ecomm-app/app/static ~/ecomm-app/app/templates ~/ecomm-app/app/static/css/
+#get source code note: we dont have a env file in our sharing folder , if we had that file then we have to use --exlude option for rysnc to ignore that file
+rysnc -avz sahil@192.168.0.104:/home/sahil/for_share/ ~/ecomm-app
+#organize files needed in different folder
+find ~/ecomm-app -maxdepth 1 -name "*.py" -exec mv {} ~/ecomm-app/app/ \;
+find ~/ecomm-app -maxdepth 1 -name "*.js" -exec mv {} ~/ecomm-app/app/static/ \;
+find ~/ecomm-app -maxdepth 1 -name "*.html" -exec mv {} ~/ecomm-app/app/template/ \;
+find ~/ecomm-app -maxdepth 1 -name "*.css" -exec mv {} ~/ecomm-app/app/static/css/ \;
 cd ~/ecomm-app
+#check if the virtual env exists or not
+if [ ! -d my-venv ]
+then
+	python3 -m venv my-venv
+fi
+#to avoid source errors using absolute path for commands
+./my-venv/bin/pip install --upgrade pip
+./my-venv/bin/pip install flask flask-sqlalchemy
 
-python3 -m venv my-venv
-source my-venv/bin/activate
-pip install flask flask-sqlalchemy
+EXISTING_PID=$(lsof -t -i:5000)
+if [ ! -z "$EXISTING_PID" ]
+then
+	echo "Cleaning up existing process on port 5000.."
+	kill -9 $EXISTING_PID
+fi
 
-#here we get code files from remote server
-rsync -avz sahil@192.168.0.104:/home/sahil/for_share/  ~/ecomm-app/
-cd ~/ecomm-app
-mkdir app
-mv *.py app/
-cd app
-mkdir  static templates
-cd ..
-mv *.js app/static/
-mv *.html app/templates/
-
-#try to run the application
-nohup python3 app/app.py > app.log 2>&1 &
+#running appliction and health check
+nohup ./my-venv/bin/python3 app/app.py >app.log 2>&1 &
 FLASK_PID=$!
-echo "Flask started with PID: $FLASK_PID"
-
-# 4. Wait for the server to initialize
-echo "Waiting 5 seconds for startup..."
+echo "Waiting for startup..."
 sleep 5
 
-# 5. Run your test
-echo "Running Health Check..."
-curl -v http://127.0.0.1:5000/health
+if curl -s --head http://127.0.0.1:5000/health | grep "200 OK" > /dev/null
+then
+	echo "Health check done"
+else
+	echo "Failed health check"
+	exit 1
+fi
 
-# 6. Kill the application
-echo "Testing complete. Closing application..."
-#kill $FLASK_PID
-
-echo "Application stopped. DONE"
+echo "Deployed Application with $FLASK_PID PID"
 
