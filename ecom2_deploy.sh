@@ -8,6 +8,7 @@
 APP_USER="ecom-service"
 APP_DIR="/home/$APP_USER/ecommerce-app"
 REPO_URL="" 
+APP_VERSION="v1.0"  # Change this to upgrade your server
 
 # Ensure script is run as root
 if [[ $EUID -ne 0 ]]; then
@@ -34,16 +35,20 @@ if ! id "$APP_USER" &>/dev/null; then
     echo " Created service user: $APP_USER"
 fi
 
-# --- 4. SOURCE CODE GRAB FROM PUBLIC REPO  ---
-echo " Fetching code from Git..."
+  
+# --- DEPLOYMENT LOGIC ---
 if [ ! -d "$APP_DIR/.git" ]; then
-    # First time: Clone the repo as the service user
-    sudo -u "$APP_USER" -H git clone "$REPO_URL" "$APP_DIR"
+    echo "First time deploy: Cloning version $APP_VERSION"
+    sudo -u "$APP_USER" -H git clone --branch "$APP_VERSION" --depth 1 "$REPO_URL" "$APP_DIR"
 else
-    # Update: Fetch and Reset to mirror the remote main branch exactly using reset --hard
-    sudo -u "$APP_USER" -H bash -c "cd $APP_DIR && git fetch --all && git reset --hard origin/main"
+    echo "Updating to version $APP_VERSION"
+    sudo -u "$APP_USER" -H bash -c "
+        cd $APP_DIR
+        git fetch --all --tags
+        git checkout tags/$APP_VERSION
+        git reset --hard tags/$APP_VERSION  # Force local files to match the tag exactly
+    "
 fi
-
 # --- 5. ENVIRONMENT SETUP (Virtual Env) ---
 if [ ! -d "$APP_DIR/venv" ]; then
     sudo -u "$APP_USER" -H python3 -m venv "$APP_DIR/venv"
