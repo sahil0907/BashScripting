@@ -1,10 +1,13 @@
 #!/bin/bash
 
 # --- Tier 3: Nginx Infrastructure Script ---
-
+if ! nginx -v 2>&1 /dev/null
+then    
+    apt update && apt install nginx -y
+fi
 # 1. Define where the actual code is currently located
-PROJECT_ROOT="/home/ecom-service'ecommerce-app" 
-CONF_NAME="ecommerce_app"
+PROJECT_ROOT="/home/ecom-service/ecommerce-app" 
+CONF_NAME="ecommerce"
 
 echo "Setting up Nginx for project at: $PROJECT_ROOT"
 
@@ -22,7 +25,7 @@ server {
 
     location /static/ {
         # Using the variable to ensure Nginx finds your assets
-        alias $PROJECT_ROOT/static/;
+        alias /home/ecom-service/ecommerce-app/app/static/;
     }
 }
 EOF
