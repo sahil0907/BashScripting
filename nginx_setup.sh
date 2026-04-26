@@ -3,13 +3,13 @@
 # --- Tier 3: Nginx Infrastructure Script ---
 
 # 1. Define where the actual code is currently located
-PROJECT_ROOT="" 
+PROJECT_ROOT="/home/ecom-service'ecommerce-app" 
 CONF_NAME="ecommerce_app"
 
 echo "Setting up Nginx for project at: $PROJECT_ROOT"
 
 # 2. Create the configuration file dynamically
-cat <<EOF > /tmp/$CONF_NAME
+cat <<EOF > /etc/nginx/sites-available/ecommerce
 server {
     listen 80;
     server_name localhost;
@@ -29,7 +29,6 @@ EOF
 
 # 3. Move to Nginx directories with sudo
 echo "Applying system configurations..."
-sudo mv /tmp/$CONF_NAME /etc/nginx/sites-available/$CONF_NAME
 sudo ln -sf /etc/nginx/sites-available/$CONF_NAME /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
 
