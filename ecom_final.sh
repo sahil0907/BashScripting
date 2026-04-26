@@ -1,84 +1,114 @@
 #!/bin/bash
 set -euo pipefail
 
-# --- CONFIG ---
+# --- CONFIGURATION ---
 readonly APP_USER="ecom-service"
 readonly PROJECT_ROOT="/home/$APP_USER/ecommerce-app"
 readonly REPO_URL="https://github.com/sahil0907/Ecommerce-app"
 readonly DB_NAME="ecom_db"
 readonly DB_USER="ecom_user"
 readonly DB_PASS="ecom_password"
+readonly SAFE_ENV="/home/$APP_USER/app.env"
 readonly LOG_FILE="/var/log/ecommerce_deploy.log"
 
-# --- ERROR TRAP ---
-trap 'echo "❌ Error on line $LINENO. Check $LOG_FILE for details."; exit 1' ERR
-
+# --- HELPER FUNCTIONS ---
 log_info() { echo "[$(date)] ℹ️  $1" | tee -a "$LOG_FILE"; }
 
-# --- FUNCTIONS ---
+# Error handler  
+trap 'echo "❌ Error in function ${FUNCNAME:-main} on line $LINENO"; exit 1' ERR
 
-setup_environment() {
-    log_info "Setting up user and folder permissions..."
+# --- CORE MODULES ---
+
+setup_system_deps() {
+    log_info "Installing system dependencies..."
+    apt update -qq && apt install -y python3-venv postgresql nginx git curl
+    
     if ! id "$APP_USER" &>/dev/null; then
         useradd -m -s /usr/sbin/nologin "$APP_USER"
     fi
-    # The 'Gate Keeper' fix for Nginx
     chmod o+x "/home/$APP_USER"
-    mkdir -p "$PROJECT_ROOT"
-    chown "$APP_USER":"$APP_USER" "$PROJECT_ROOT"
 }
 
 provision_secrets() {
-    log_info "Provisioning .env secrets..."
-    local env_file="$PROJECT_ROOT/app/.env"
-    # Create .env if it doesn't exist
-    sudo -u "$APP_USER" bash -c "cat <<EOF > $env_file
+    log_info "Creating secret environment file at $SAFE_ENV..."
+    local secret_key=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 32)
+    
+    cat <<EOF > "$SAFE_ENV"
 DATABASE_URL=postgresql://$DB_USER:$DB_PASS@localhost/$DB_NAME
-FLASK_SECRET_KEY=$(python3 -c 'import os; print(os.urandom(24).hex())')
-EOF"
-    chmod 600 "$env_file"
+FLASK_SECRET_KEY=$secret_key
+EOF
+    chown "$APP_USER":"$APP_USER" "$SAFE_ENV"
+    chmod 600 "$SAFE_ENV"
 }
 
-sync_db_schema() {
-    log_info "Syncing PostgreSQL schema and seeding data..."
-    # We call the init_db function directly via Python
-    sudo -u "$APP_USER" "$PROJECT_ROOT/venv/bin/python3" -c "from app import app, init_db; init_db()"
+sync_source_code() {
+    log_info "Syncing code from GitHub..."
+    if [ -d "$PROJECT_ROOT" ]; then
+        rm -rf "$PROJECT_ROOT"
+    fi
+    sudo -u "$APP_USER" -H git clone --depth 1 "$REPO_URL" "$PROJECT_ROOT"
 }
 
-configure_systemd() {
-    log_info "Updating systemd service..."
+init_database() {
+    log_info "Initializing PostgreSQL..."
+    systemctl start postgresql
+    sudo -u postgres psql -c "CREATE USER $DB_USER WITH PASSWORD '$DB_PASS';" || true
+    sudo -u postgres psql -c "CREATE DATABASE $DB_NAME OWNER $DB_USER;" || true
+    sudo -u postgres psql -d "$DB_NAME" -c "ALTER SCHEMA public OWNER TO $DB_USER;" || true
+}
+
+prepare_python_app() {
+    log_info "Setting up VirtualEnv and Database Schema..."
+    sudo -u "$APP_USER" -H python3 -m venv "$PROJECT_ROOT/venv"
+    sudo -u "$APP_USER" -H "$PROJECT_ROOT/venv/bin/pip" install --upgrade pip
+    sudo -u "$APP_USER" -H "$PROJECT_ROOT/venv/bin/pip" install flask flask-sqlalchemy python-dotenv psycopg2-binary gunicorn
+
+    # The manual schema trigger
+    sudo -u "$APP_USER" -H bash -c "export \$(cat $SAFE_ENV | xargs) && cd $PROJECT_ROOT/app && ../venv/bin/python3 -c 'from app import app, init_db; init_db()'"
+}
+
+configure_services() {
+    log_info "Configuring Systemd and Nginx..."
+    
+    # Systemd Service
     cat <<EOF > /etc/systemd/system/ecommerce.service
 [Unit]
-Description=Gunicorn Flask Service
+Description=Gunicorn Ecommerce Service
 After=network.target postgresql.service
 
 [Service]
 User=$APP_USER
 Group=$APP_USER
 WorkingDirectory=$PROJECT_ROOT/app
-EnvironmentFile=$PROJECT_ROOT/app/.env
+EnvironmentFile=$SAFE_ENV
 ExecStart=$PROJECT_ROOT/venv/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 app:app
 Restart=always
 
 [Install]
 WantedBy=multi-user.target
 EOF
+
     systemctl daemon-reload
+    systemctl enable ecommerce
     systemctl restart ecommerce
+    
+    # Permissions for Nginx to serve static files
+    chmod -R 755 "$PROJECT_ROOT/app/static"
+    systemctl reload nginx
 }
 
-# --- MAIN FLOW ---
+# --- MAIN EXECUTION ---
 main() {
-    setup_environment
-    # ... (Include your git clone and venv setup here) ...
-    provision_secrets
-    sync_db_schema    # This solves your 'Internal Server Error'
-    configure_systemd
+    [[ $EUID -ne 0 ]] && { echo "Must run as root"; exit 1; }
     
-    # Ensure Nginx can see the static files
-    chmod -R 755 "$PROJECT_ROOT/app/static"
+    setup_system_deps
+    provision_secrets   
+    sync_source_code     
+    init_database
+    prepare_python_app
+    configure_services
     
-    log_info "🚀 Deployment Complete!"
+    log_info "🚀 MODULAR DEPLOYMENT SUCCESSFUL!"
 }
 
 main
