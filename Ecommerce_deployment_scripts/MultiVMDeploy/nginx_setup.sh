@@ -6,7 +6,6 @@ then
     apt update && apt install nginx -y
 fi
 # 1. Define where the actual code is currently located
-PROJECT_ROOT="/home/ecom-service/ecommerce-app" 
 CONF_NAME="ecommerce"
 
 echo "Setting up Nginx for project at: $PROJECT_ROOT"
@@ -15,17 +14,17 @@ echo "Setting up Nginx for project at: $PROJECT_ROOT"
 cat <<EOF > /etc/nginx/sites-available/ecommerce
 server {
     listen 80;
-    server_name localhost;
+    server_name ecom.com;
 
     location / {
-        proxy_pass http://127.0.0.1:8000;
+        proxy_pass http://192.168.15.135:8000;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
     }
 
     location /static/ {
         # Using the variable to ensure Nginx finds your assets
-        alias /home/ecom-service/ecommerce-app/app/static/;
+        alias /home/ecom-service/ecommerce-app/app/static/; #using rsync to get the static files from the application code
     }
 }
 EOF
