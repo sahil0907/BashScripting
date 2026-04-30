@@ -1,14 +1,18 @@
 #!/bin/bash
+USER="nginx_user"
+#creating a special user
+useradd -m -s /bin/bash "$USER"
+echo "4323" | passwd "$USER" --stdin
+chown "$USER":"$USER" /var/www/static
+chmod 755 "$USER":"$USER" /var/www/static
 
 # --- Tier 3: Nginx Infrastructure Script ---
 if ! nginx -v 2>&1 /dev/null
 then    
-    apt update && apt install nginx -y
+    apt update -qq && apt install nginx -y
 fi
-# 1. Define where the actual code is currently located
-CONF_NAME="ecommerce"
 
-echo "Setting up Nginx for project at: $PROJECT_ROOT"
+CONF_NAME="ecommerce"
 
 # 2. Create the configuration file dynamically
 cat <<EOF > /etc/nginx/sites-available/ecommerce
@@ -24,7 +28,7 @@ server {
 
     location /static/ {
         # Using the variable to ensure Nginx finds your assets
-        alias /home/ecom-service/ecommerce-app/app/static/; #using rsync to get the static files from the application code
+        alias /var/www/static; #using rsync to get the static files from the application code
     }
 }
 EOF
