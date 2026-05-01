@@ -1,11 +1,10 @@
 #!/bin/bash
 USER="nginx_user"
 $IP="192.168.15.137"
-#creating a special user
-useradd -m -s /bin/bash "$USER"
-chown "$USER":"$USER" /var/www/static
+#creating a special 
+useruseradd -m -s /bin/bash "$USER"
+chown " $USER":"$USER" /var/www/static
 chmod 755 "$USER":"$USER" /var/www/static
-
 
 
 # --- Tier 3: Nginx Infrastructure Script ---
