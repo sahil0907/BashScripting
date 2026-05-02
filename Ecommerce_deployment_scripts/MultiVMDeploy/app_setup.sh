@@ -2,7 +2,7 @@
 readonly DB_NAME="ecom_db"
 readonly DB_USER="ecom_user"
 readonly DB_PASS="ecom_password"
-readonly DB_IP="192.168.15.136"
+readonly DB_IP="192.168.15.137"
 readonly APP_USER="ecom-service"
 readonly PROJECT_DIR="/home/$APP_USER/ecommerce_app"
 readonly GIT_URL="https://github.com/sahil0907/Ecommerce-app"
@@ -59,7 +59,7 @@ setup_sshkeys()
 nginx_setup()
 
 {      
-     echo "------------------------------------------------------"
+    echo "------------------------------------------------------"
 
     echo "NGINX SETUP"
     echo " Syncing static assets to Nginx VM..."
@@ -72,8 +72,8 @@ nginx_setup()
 
 
 python_dependencies()
-{    echo "------------------------------------------------------"
-
+{    
+    echo "------------------------------------------------------"
     echo "checking dependencesi"
     sudo -u "$APP_USER" -H  python3 -m venv "$PROJECT_DIR/venv"
     sudo -u "$APP_USER" -H "$PROJECT_DIR/venv/bin/pip" install --upgrade pip
@@ -83,21 +83,7 @@ python_dependencies()
     echo "------------------------------------------------------"
 }
 
-provision_secrets()
-{    echo "------------------------------------------------------"
-
-    echo "Secret provisioning"
-    local secretkey=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 32)
-
-    cat <<EOF > "$SECRET_DIR"
-DATABASE_URL=postgresql://$DB_USER:$DB_PASS@$DB_IP/$DB_NAME
-SECRET_KEY=$secretkey
-EOF 
-    chmod 600 "$SECRET_DIR"
-    chown "$APP_USER":"$APP_USER" "$SECRET_DIR"
-    echo "------------------------------------------------------"
-}
-
+ 
 creating_service()
 {
     echo "------------------------------------------------------"
@@ -122,6 +108,17 @@ echo "restarting the service"
         systemctl daemon-reload
         systemctl enable ecommerce
         systemctl restart ecommerce
+}
+
+provision_secrets() {
+     local secret_key=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 32)
+    
+    cat <<EOF > "$SECRET_DIR"
+DATABASE_URL=postgresql://$DB_USER:$DB_PASS@$DB_IP/$DB_NAME
+FLASK_SECRET_KEY=$secret_key
+EOF
+    chown "$APP_USER":"$APP_USER" "$SECRET_DIR"
+    chmod 600 "$SECRET_DIR"
 }
 
 main()
