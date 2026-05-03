@@ -40,7 +40,6 @@ get_code()
 setup_sshkeys()
 {    echo "------------------------------------------------------"
 
-    echo "SSH SETUP"
     local USER="nginx_user"
     local IP="192.168.15.136"
     local PASS="4323"
@@ -61,7 +60,6 @@ nginx_setup()
 {      
     echo "------------------------------------------------------"
 
-    echo "NGINX SETUP"
     echo " Syncing static assets to Nginx VM..."
     local USER="nginx_user"
     local IP="192.168.15.136"
@@ -74,7 +72,6 @@ nginx_setup()
 python_dependencies()
 {    
     echo "------------------------------------------------------"
-    echo "checking dependencesi"
     sudo -u "$APP_USER" -H  python3 -m venv "$PROJECT_DIR/venv"
     sudo -u "$APP_USER" -H "$PROJECT_DIR/venv/bin/pip" install --upgrade pip
     sudo -u "$APP_USER" -H "$PROJECT_DIR/venv/bin/pip" install --upgrade flask flask-sqlalchemy python-dotenv psycopg2-binary gunicorn
@@ -87,7 +84,6 @@ python_dependencies()
 creating_service()
 {
     echo "------------------------------------------------------"
-    echo "Creating service user"
 cat <<EOF > /etc/systemd/system/ecommerce.service
 [Unit]
 Description=Gunicorn Ecommerce Service
