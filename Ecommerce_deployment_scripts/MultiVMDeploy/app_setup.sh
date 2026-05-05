@@ -20,7 +20,7 @@ setup_dependencies()
     echo "Creating service user"
     if  ! id "$APP_USER" &>/dev/null 
     then
-        useradd -m -s /usr/sbin/nologin "$APP_USER"
+        useradd -m -s /usr/sbin/nologin "$APP_USER" #make sure the user had no login shell for security
     fi
  
 }
@@ -46,11 +46,11 @@ setup_sshkeys()
     #creating keys if not present
     if [ ! -f "/home/$APP_USER/.ssh/id_rsa" ]; then
         sudo -u "$APP_USER" mkdir -p "/home/$APP_USER/.ssh"
-        sudo -u "$APP_USER" chmod 700 "/home/$APP_USER/.ssh"
+        sudo -u "$APP_USER" chmod 700 "/home/$APP_USER/.ssh" 
         sudo -u "$APP_USER" ssh-keygen -t rsa -b 4096 -f "/home/$APP_USER/.ssh/id_rsa" -N ""
     fi
 
-    sudo -u "$APP_USER" sshpass -p "$PASS" ssh-copy-id -o StrictHostKeyChecking=no "$USER@$IP"
+    sudo -u "$APP_USER" sshpass -p "$PASS" ssh-copy-id -o StrictHostKeyChecking=no "$USER@$IP" #using StrictHostKeyChecking to make sure it doesnt ask for password 
     echo "------------------------------------------------------"
 
 }
@@ -64,7 +64,7 @@ nginx_setup()
     local USER="nginx_user"
     local IP="192.168.15.136"
 
-    sudo -u "$APP_USER" rsync -avz "$PROJECT_DIR/app/static/" "$USER@$IP":/var/www/static/
+    sudo -u "$APP_USER" rsync -avz "$PROJECT_DIR/app/static/" "$USER@$IP":/var/www/static/ #syncing the static files from appvm to the nginxvm
     echo "------------------------------------------------------"
 }
 
@@ -80,10 +80,11 @@ python_dependencies()
     echo "------------------------------------------------------"
 }
 
- 
+ #running the application as a service 
 creating_service()
 {
     echo "------------------------------------------------------"
+    #using 0.0.0.0 instead of localhost when we start working with 3 vms
 cat <<EOF > /etc/systemd/system/ecommerce.service
 [Unit]
 Description=Gunicorn Ecommerce Service
@@ -93,7 +94,7 @@ User=$APP_USER
 Group=$APP_USER
 WorkingDirectory=$PROJECT_DIR/app
 EnvironmentFile=$SECRET_DIR
-ExecStart=$PROJECT_DIR/venv/bin/gunicorn --workers 3 --bind 0.0.0.0:8000 app:app
+ExecStart=$PROJECT_DIR/venv/bin/gunicorn --workers 3 --bind 0.0.0.0:8000 app:app 
 Restart=always
 
 [Install]
@@ -105,7 +106,7 @@ echo "restarting the service"
         systemctl enable ecommerce
         systemctl restart ecommerce
 }
-
+#creating secret env file for db password , url and flask key.
 provision_secrets() {
      local secret_key=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 32)
     
