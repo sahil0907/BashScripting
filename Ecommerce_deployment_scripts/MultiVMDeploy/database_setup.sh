@@ -23,4 +23,6 @@ init_database() {
     # Grant permissions
     sudo -u postgres psql -d "$DB_NAME" -c "GRANT ALL PRIVILEGES ON SCHEMA public TO $DB_USER;"
  }
+ #setup db backup cronjob here
+ 
 init_database
