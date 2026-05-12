@@ -15,7 +15,7 @@ trap 'echo " Error in function ${FUNCNAME:-main} on line $LINENO"; exit 1' ERR
 setup_dependencies()
 {
     echo "Adding python3-venv"
-    apt update -qq && apt install python3-venv git postgresql nginx curl sshpass  -y
+    apt update -qq && apt install python3-venv git nginx curl sshpass  -y
 
     echo "Creating service user"
     if  ! id "$APP_USER" &>/dev/null 
